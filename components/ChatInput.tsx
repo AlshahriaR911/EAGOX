@@ -1,6 +1,7 @@
 import React from 'react';
 import { RippleButton } from './common/RippleButton';
 import type { ChatMode } from '../types';
+import { MicrophoneIcon } from './icons/MicrophoneIcon';
 
 const SendIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -13,19 +14,21 @@ interface ChatInputProps {
     onSendMessage: (message: string) => void;
     isLoading: boolean;
     chatMode: ChatMode;
+    isVoiceActive: boolean;
+    onToggleVoiceSession: () => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, chatMode }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, chatMode, isVoiceActive, onToggleVoiceSession }) => {
     const [message, setMessage] = React.useState('');
     const textAreaRef = React.useRef<HTMLTextAreaElement>(null);
 
     React.useEffect(() => {
-        if (textAreaRef.current) {
+        if (chatMode !== 'voice' && textAreaRef.current) {
             textAreaRef.current.style.height = 'auto';
             const scrollHeight = textAreaRef.current.scrollHeight;
             textAreaRef.current.style.height = `${scrollHeight}px`;
         }
-    }, [message]);
+    }, [message, chatMode]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -51,7 +54,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
         text: 'Type your message to EAGOX...',
         image: 'Describe the image you want to create...',
         multimodal: 'Chat with EAGOX... (try /image or /video)',
+        voice: 'Start conversation with EAGOX...'
     }[chatMode];
+
+    if (chatMode === 'voice') {
+        return (
+            <div className="px-4 pb-4 md:px-6 md:pb-6 flex flex-col items-center justify-center pt-2">
+                 <RippleButton 
+                    onClick={onToggleVoiceSession}
+                    className={`w-16 h-16 flex items-center justify-center rounded-full transition-all duration-300 text-white ${isVoiceActive ? 'bg-red-500 animate-pulse' : 'bg-lt-brand-primary dark:bg-brand-primary'}`}
+                    aria-label={isVoiceActive ? "Stop voice session" : "Start voice session"}
+                >
+                    <MicrophoneIcon className="w-8 h-8" />
+                </RippleButton>
+                 <p className="text-xs text-center text-lt-brand-text-secondary dark:text-brand-text-secondary mt-3">
+                    {isVoiceActive ? 'EAGOX is listening...' : 'Tap to speak'}
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="px-4 pb-4 md:px-6 md:pb-6">

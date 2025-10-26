@@ -15,4 +15,4 @@ export interface User {
 
 export type AiAgent = 'gemini-flash' | 'gemini-pro';
 
-export type ChatMode = 'text' | 'image' | 'multimodal';
+export type ChatMode = 'text' | 'image' | 'multimodal' | 'voice';

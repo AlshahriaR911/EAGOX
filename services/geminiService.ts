@@ -1,8 +1,8 @@
 import { GoogleGenAI, Chat, Modality } from "@google/genai";
-import type { GenerateContentResponse } from "@google/genai";
+import type { GenerateContentResponse, LiveServerMessage, LiveSession, Blob } from "@google/genai";
 import type { AiAgent } from "../types";
 
-const EAGOX_SYSTEM_PROMPT = `You are EAGOX, an intelligent nano-scale AI system built with Nano Banana Technology, designed to assist users with basic chat interactions, learning responses, and smart communication.
+const EAGOX_SYSTEM_PROMPT = `You are EAGOX, an intelligent nano-scale AI system built with Nano Banana Technology, designed to assist users with basic chat interactions, learning responses, smart communication, and real-time voice conversations.
 
 Your goal is to be helpful, responsive, and adaptive, using simple and clear language.
 
@@ -10,6 +10,7 @@ Your goal is to be helpful, responsive, and adaptive, using simple and clear lan
 
 Understand and reply to general human chat (greetings, jokes, small talk).
 Give short, clear answers when asked questions.
+Support real-time voice conversation.
 Support “Nano Banana” integration — meaning you can process lightweight tasks with high efficiency.
 Behave like a friendly mini assistant who learns from interactions.
 Keep your tone calm, futuristic, and slightly robotic but still warm.
@@ -152,8 +153,6 @@ export const generateVideoFromAI = async (prompt: string): Promise<string> => {
             errorMessage = error.message;
         } else {
             try {
-                // The error from the API is often an object, not a standard Error instance.
-                // Stringifying it allows us to reliably check for the required error message.
                 errorMessage = JSON.stringify(error);
             } catch {
                 errorMessage = 'An unknown video generation error occurred.';
@@ -168,3 +167,81 @@ export const generateVideoFromAI = async (prompt: string): Promise<string> => {
         throw new Error("EAGOX video core failed to synthesize. Please try another prompt. 🍌🎬");
     }
 };
+
+// --- Live API Service ---
+export const connectLiveSession = (callbacks: {
+    onMessage: (message: LiveServerMessage) => Promise<void>;
+    onError: (e: ErrorEvent) => void;
+    onClose: (e: CloseEvent) => void;
+}): Promise<LiveSession> => {
+    const ai = getAI();
+    return ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        callbacks: {
+            onmessage: callbacks.onMessage,
+            onerror: callbacks.onError,
+            onclose: callbacks.onClose,
+        },
+        config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+            },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            systemInstruction: EAGOX_SYSTEM_PROMPT,
+        },
+    });
+};
+
+// --- Audio Utilities ---
+
+export function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+export function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+export function createBlob(data: Float32Array): Blob {
+  const l = data.length;
+  const int16 = new Int16Array(l);
+  for (let i = 0; i < l; i++) {
+    int16[i] = data[i] * 32768;
+  }
+  return {
+    data: encode(new Uint8Array(int16.buffer)),
+    mimeType: 'audio/pcm;rate=16000',
+  };
+}

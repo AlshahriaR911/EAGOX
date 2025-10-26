@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ChatMode } from '../types';
 import { RippleButton } from './common/RippleButton';
+import { MicrophoneIcon } from './icons/MicrophoneIcon';
 
 const TextIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -28,9 +29,10 @@ interface ModeSelectorProps {
 }
 
 const modes: { id: ChatMode; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: 'text', label: 'Text Chat', icon: TextIcon },
-    { id: 'image', label: 'Image Gen', icon: ImageIcon },
-    { id: 'multimodal', label: 'Both', icon: MultimodalIcon },
+    { id: 'text', label: 'Text', icon: TextIcon },
+    { id: 'image', label: 'Image', icon: ImageIcon },
+    { id: 'multimodal', label: 'Multi', icon: MultimodalIcon },
+    { id: 'voice', label: 'Voice', icon: MicrophoneIcon },
 ];
 
 export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeChange, isLoading }) => {
@@ -51,9 +53,9 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeC
                         key={id}
                         onClick={() => onModeChange(id)}
                         className={getButtonClass(id)}
-                        disabled={isLoading}
+                        disabled={isLoading && id !== currentMode}
                     >
-                       <Icon className="w-4 h-4" />
+                       <Icon className="w-5 h-5" />
                        <span className="hidden sm:inline">{label}</span>
                     </RippleButton>
                 ))}

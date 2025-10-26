@@ -1,6 +1,5 @@
 import React from 'react';
 import { InfoIcon } from './icons/InfoIcon';
-import { Logo } from './icons/Logo';
 
 // FIX: Inlined missing icon components as they were not provided.
 const SunIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -42,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onLogout, on
     return (
         <header className="p-4 md:px-6 border-b border-lt-brand-border dark:border-brand-border bg-lt-brand-bg-med dark:bg-brand-bg-dark flex items-center justify-between sticky top-0 z-10">
             <div className="flex items-center gap-2">
-                <Logo className="w-auto h-7 text-lt-brand-text dark:text-brand-text" />
+                 <h1 className="text-2xl font-bold font-roba text-lt-brand-text dark:text-brand-text">EAGOX</h1>
             </div>
 
             <div className="flex items-center gap-2">

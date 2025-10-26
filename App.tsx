@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Chat } from '@google/genai';
+import { Chat, LiveSession, LiveServerMessage } from '@google/genai';
 
 import type { ChatMessage, User, ChatMode } from './types';
 import { getCurrentUser, logout } from './services/authService';
-import { createChatSession, sendMessageToAI, generateImageFromAI, generateVideoFromAI, editImageWithAI } from './services/geminiService';
+import { 
+    createChatSession, 
+    sendMessageToAI, 
+    generateImageFromAI, 
+    generateVideoFromAI, 
+    editImageWithAI,
+    connectLiveSession,
+    decode,
+    decodeAudioData,
+    createBlob
+} from './services/geminiService';
 
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
@@ -27,6 +37,19 @@ const App: React.FC = () => {
     const chatRef = useRef<Chat | null>(null);
     const [chatMode, setChatMode] = useState<ChatMode>('multimodal');
 
+    // Voice session state
+    const [isVoiceActive, setIsVoiceActive] = useState(false);
+    const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+    const currentTranscriptionRef = useRef({ user: '', model: '' });
+    const inputAudioContextRef = useRef<AudioContext | null>(null);
+    const outputAudioContextRef = useRef<AudioContext | null>(null);
+    const microphoneStreamRef = useRef<MediaStream | null>(null);
+    const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+    const audioSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+    const outputPlaybackTimeRef = useRef(0);
+    const outputAudioSourcesRef = useRef(new Set<AudioBufferSourceNode>());
+
+
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isAboutOpen, setIsAboutOpen] = useState(false);
 
@@ -42,6 +65,22 @@ const App: React.FC = () => {
         setIsAuthenticating(false);
     }, []);
 
+    // Effect to clean up voice session when mode changes or component unmounts
+    useEffect(() => {
+        return () => {
+            if (isVoiceActive) {
+                stopVoiceSession();
+            }
+        };
+    }, [isVoiceActive]);
+
+    const handleModeChange = (newMode: ChatMode) => {
+        if (isVoiceActive && newMode !== 'voice') {
+            stopVoiceSession();
+        }
+        setChatMode(newMode);
+    };
+
     const handleLogin = (user: User) => {
         setCurrentUser(user);
         setIsGuest(false);
@@ -56,6 +95,7 @@ const App: React.FC = () => {
     };
 
     const handleLogout = () => {
+        if (isVoiceActive) stopVoiceSession();
         logout();
         setCurrentUser(null);
         setMessages([]);
@@ -120,6 +160,129 @@ const App: React.FC = () => {
         }
     };
     
+    // --- Voice Session Logic ---
+
+    const startVoiceSession = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            microphoneStreamRef.current = stream;
+            setIsVoiceActive(true);
+
+            // FIX: Cast window to `any` to support `webkitAudioContext` for older browsers without TypeScript errors.
+            inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+
+            sessionPromiseRef.current = connectLiveSession({
+                onMessage: handleLiveMessage,
+                onError: handleLiveError,
+                onClose: stopVoiceSession,
+            });
+
+            // This must be done after sessionPromise is set
+            audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(stream);
+            scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
+            
+            scriptProcessorRef.current.onaudioprocess = (audioProcessingEvent) => {
+                const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+                const pcmBlob = createBlob(inputData);
+                sessionPromiseRef.current?.then((session) => {
+                    session.sendRealtimeInput({ media: pcmBlob });
+                });
+            };
+
+            audioSourceRef.current.connect(scriptProcessorRef.current);
+            scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
+
+        } catch (error) {
+            console.error("Failed to start voice session:", error);
+            const errorMessage: ChatMessage = { role: 'model', content: "Failed to access microphone. Please grant permission and try again. 🍌🎤" };
+            setMessages(prev => [...prev, errorMessage]);
+            setIsVoiceActive(false);
+        }
+    };
+
+    const stopVoiceSession = () => {
+        sessionPromiseRef.current?.then(session => session.close());
+        sessionPromiseRef.current = null;
+        
+        microphoneStreamRef.current?.getTracks().forEach(track => track.stop());
+        microphoneStreamRef.current = null;
+
+        audioSourceRef.current?.disconnect();
+        scriptProcessorRef.current?.disconnect();
+        audioSourceRef.current = null;
+        scriptProcessorRef.current = null;
+
+        inputAudioContextRef.current?.close();
+        outputAudioContextRef.current?.close();
+        inputAudioContextRef.current = null;
+        outputAudioContextRef.current = null;
+        
+        outputAudioSourcesRef.current.forEach(source => source.stop());
+        outputAudioSourcesRef.current.clear();
+        outputPlaybackTimeRef.current = 0;
+        
+        setIsVoiceActive(false);
+    };
+
+    const handleToggleVoiceSession = () => {
+        if (isVoiceActive) {
+            stopVoiceSession();
+        } else {
+            startVoiceSession();
+        }
+    };
+
+    const handleLiveMessage = async (message: LiveServerMessage) => {
+        // Handle transcription
+        if (message.serverContent?.inputTranscription) {
+            currentTranscriptionRef.current.user += message.serverContent.inputTranscription.text;
+        }
+        if (message.serverContent?.outputTranscription) {
+            currentTranscriptionRef.current.model += message.serverContent.outputTranscription.text;
+        }
+        if (message.serverContent?.turnComplete) {
+            const userText = currentTranscriptionRef.current.user.trim();
+            const modelText = currentTranscriptionRef.current.model.trim();
+            if(userText) setMessages(prev => [...prev, { role: 'user', content: userText }]);
+            if(modelText) setMessages(prev => [...prev, { role: 'model', content: modelText }]);
+            currentTranscriptionRef.current = { user: '', model: '' };
+        }
+
+        // Handle audio output
+        const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+        if (base64Audio && outputAudioContextRef.current) {
+            const audioCtx = outputAudioContextRef.current;
+            outputPlaybackTimeRef.current = Math.max(outputPlaybackTimeRef.current, audioCtx.currentTime);
+
+            const audioBuffer = await decodeAudioData(decode(base64Audio), audioCtx, 24000, 1);
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioCtx.destination);
+            source.addEventListener('ended', () => {
+                outputAudioSourcesRef.current.delete(source);
+            });
+            source.start(outputPlaybackTimeRef.current);
+            outputPlaybackTimeRef.current += audioBuffer.duration;
+            outputAudioSourcesRef.current.add(source);
+        }
+
+        // Handle interruptions
+        if (message.serverContent?.interrupted) {
+            outputAudioSourcesRef.current.forEach(source => source.stop());
+            outputAudioSourcesRef.current.clear();
+            outputPlaybackTimeRef.current = 0;
+        }
+    };
+
+    const handleLiveError = (e: ErrorEvent) => {
+        console.error("Voice session error:", e);
+        const errorMessage: ChatMessage = { role: 'model', content: "EAGOX voice system encountered an error. 🍌🔧" };
+        setMessages(prev => [...prev, errorMessage]);
+        stopVoiceSession();
+    };
+
+
     if (isAuthenticating) {
         return <div className="min-h-screen bg-lt-brand-bg-light dark:bg-brand-bg-dark" />;
     }
@@ -137,6 +300,7 @@ const App: React.FC = () => {
     }
 
     const userInitial = currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'G';
+    const anyLoading = isLoading || isGeneratingVideo || isVoiceActive;
 
     return (
         <div className="flex flex-col h-screen bg-lt-brand-bg-light dark:bg-brand-bg-dark font-sans">
@@ -154,13 +318,15 @@ const App: React.FC = () => {
                 <div className="border-t border-lt-brand-border dark:border-brand-border bg-lt-brand-bg-med dark:bg-brand-bg-dark">
                     <ModeSelector 
                         currentMode={chatMode}
-                        onModeChange={setChatMode}
-                        isLoading={isLoading || isGeneratingVideo}
+                        onModeChange={handleModeChange}
+                        isLoading={anyLoading}
                     />
                     <ChatInput 
                         onSendMessage={handleSendMessage} 
-                        isLoading={isLoading || isGeneratingVideo} 
-                        chatMode={chatMode} 
+                        isLoading={anyLoading} 
+                        chatMode={chatMode}
+                        isVoiceActive={isVoiceActive}
+                        onToggleVoiceSession={handleToggleVoiceSession}
                     />
                 </div>
             </main>
