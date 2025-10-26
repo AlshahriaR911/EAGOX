@@ -1,5 +1,8 @@
+
 import React from 'react';
+import type { User } from '../types';
 import { InfoIcon } from './icons/InfoIcon';
+import { MenuIcon } from './icons/MenuIcon';
 
 // FIX: Inlined missing icon components as they were not provided.
 const SunIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -33,15 +36,22 @@ interface HeaderProps {
     onLogout: () => void;
     onProfileClick: () => void;
     onAboutClick: () => void;
-    userInitial: string;
+    onToggleSidebar: () => void;
+    user: User;
     isGuest: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onLogout, onProfileClick, onAboutClick, userInitial, isGuest }) => {
+export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onLogout, onProfileClick, onAboutClick, onToggleSidebar, user, isGuest }) => {
     return (
-        <header className="p-4 md:px-6 border-b border-lt-brand-border dark:border-brand-border bg-lt-brand-bg-med dark:bg-brand-bg-dark flex items-center justify-between sticky top-0 z-10">
+        <header className="relative p-4 md:px-6 border-b border-lt-brand-border dark:border-brand-border bg-lt-brand-bg-med dark:bg-brand-bg-dark flex items-center justify-between sticky top-0 z-30">
             <div className="flex items-center gap-2">
-                 <h1 className="text-2xl font-bold font-roba text-lt-brand-text dark:text-brand-text">EAGOX</h1>
+                 <button onClick={onToggleSidebar} className="p-2 rounded-full text-lt-brand-text-secondary dark:text-brand-text-secondary hover:bg-lt-brand-border dark:hover:bg-brand-border transition-colors" aria-label="Toggle history sidebar">
+                    <MenuIcon className="w-5 h-5" />
+                </button>
+            </div>
+
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                <h1 className="text-2xl font-bold font-roba text-lt-brand-text dark:text-brand-text">EAGOX</h1>
             </div>
 
             <div className="flex items-center gap-2">
@@ -62,8 +72,12 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onLogout, on
                  <button onClick={onLogout} className="p-2 rounded-full text-lt-brand-text-secondary dark:text-brand-text-secondary hover:bg-lt-brand-border dark:hover:bg-brand-border transition-colors" aria-label="Logout">
                     <LogoutIcon className="w-5 h-5" />
                 </button>
-                 <div className="w-8 h-8 rounded-full bg-lt-brand-primary-light dark:bg-brand-primary-dark flex items-center justify-center text-lt-brand-text dark:text-brand-text font-bold text-sm ml-2">
-                    {userInitial}
+                 <div className="w-8 h-8 rounded-full bg-lt-brand-primary-light dark:bg-brand-primary-dark flex items-center justify-center text-lt-brand-text dark:text-brand-text font-bold text-sm ml-2 overflow-hidden">
+                    {user.photoUrl ? (
+                        <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                         user.name.charAt(0).toUpperCase()
+                    )}
                 </div>
             </div>
         </header>

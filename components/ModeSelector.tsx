@@ -4,6 +4,7 @@ import { RippleButton } from './common/RippleButton';
 import { MicrophoneIcon } from './icons/MicrophoneIcon';
 import { CodeIcon } from './icons/CodeIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
+import { VideoIcon } from './icons/VideoIcon';
 
 const TextIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -36,7 +37,11 @@ const featureModes: { id: ChatMode; label: string; icon: React.FC<{ className?: 
     { id: 'code', label: 'Code', icon: CodeIcon },
 ];
 
-const voiceMode = { id: 'voice', label: 'Voice', icon: MicrophoneIcon };
+// Fix: Explicitly typed `liveInteractionModes` to ensure `mode.id` is of type `ChatMode`.
+const liveInteractionModes: { id: ChatMode; label: string; icon: React.FC<{ className?: string }> }[] = [
+    { id: 'live', label: 'Live', icon: VideoIcon },
+    { id: 'voice', label: 'Voice', icon: MicrophoneIcon }
+];
 
 
 export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeChange, isLoading }) => {
@@ -65,9 +70,9 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeC
     const activeFeatureMode = featureModes.find(m => m.id === currentMode) || featureModes[0];
     const ActiveIcon = activeFeatureMode.icon;
     
-    const getVoiceButtonClass = () => {
+    const getButtonClass = (mode: ChatMode) => {
         const baseClass = "flex-1 text-sm font-medium py-2 px-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
-        if (currentMode === 'voice') {
+        if (currentMode === mode) {
             return `${baseClass} bg-lt-brand-primary dark:bg-brand-primary text-white shadow`;
         }
         return `${baseClass} bg-lt-brand-surface dark:bg-brand-surface text-lt-brand-text-secondary dark:text-brand-text-secondary hover:bg-lt-brand-border dark:hover:bg-brand-border`;
@@ -85,7 +90,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeC
         <div className="px-4 md:px-6 pt-4 max-w-4xl mx-auto w-full">
             <div className="p-1.5 bg-lt-brand-bg-light dark:bg-brand-bg-dark rounded-xl border border-lt-brand-border dark:border-brand-border flex items-center gap-1.5">
                 {/* Feature Dropdown */}
-                <div className="relative flex-[4]" ref={dropdownRef}>
+                <div className="relative flex-[3]" ref={dropdownRef}>
                     <RippleButton
                         onClick={() => setIsOpen(!isOpen)}
                         className={getFeatureButtonClass()}
@@ -121,16 +126,18 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeC
                     )}
                 </div>
 
-                {/* Voice Button */}
-                <RippleButton
-                    key={voiceMode.id}
-                    onClick={() => onModeChange(voiceMode.id)}
-                    className={getVoiceButtonClass()}
-                    disabled={isLoading && voiceMode.id !== currentMode}
-                >
-                    <voiceMode.icon className="w-5 h-5" />
-                    <span className="hidden sm:inline">{voiceMode.label}</span>
-                </RippleButton>
+                {/* Live Interaction Buttons */}
+                {liveInteractionModes.map(mode => (
+                     <RippleButton
+                        key={mode.id}
+                        onClick={() => onModeChange(mode.id)}
+                        className={getButtonClass(mode.id)}
+                        disabled={isLoading && mode.id !== currentMode}
+                    >
+                        <mode.icon className="w-5 h-5" />
+                        <span className="hidden sm:inline">{mode.label}</span>
+                    </RippleButton>
+                ))}
             </div>
         </div>
     );

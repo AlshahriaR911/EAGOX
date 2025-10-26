@@ -16,11 +16,11 @@ interface ChatInputProps {
     onSendMessage: (message: string, image?: { data: string; mimeType: string }) => void;
     isLoading: boolean;
     chatMode: ChatMode;
-    isVoiceActive: boolean;
-    onToggleVoiceSession: () => void;
+    isSessionActive: boolean;
+    onToggleSession: () => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, chatMode, isVoiceActive, onToggleVoiceSession }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, chatMode, isSessionActive, onToggleSession }) => {
     const [message, setMessage] = React.useState('');
     const [imagePreview, setImagePreview] = React.useState<{ data: string; mimeType: string; rawUrl: string } | null>(null);
     const textAreaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -78,7 +78,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
         image: 'Describe the image you want to create...',
         code: 'Describe the code you want to generate...',
         multimodal: 'Type a message or attach an image...',
-        voice: 'Start conversation with EAGOX...'
+        voice: 'Start conversation with EAGOX...',
+        live: 'Start a live video session...'
     }[chatMode];
 
     const canAttachFile = ['text', 'multimodal', 'code'].includes(chatMode);
@@ -88,14 +89,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
         return (
             <div className="px-4 pb-4 md:px-6 md:pb-6 flex flex-col items-center justify-center pt-2">
                  <RippleButton 
-                    onClick={onToggleVoiceSession}
-                    className={`w-16 h-16 flex items-center justify-center rounded-full transition-all duration-300 text-white ${isVoiceActive ? 'bg-red-500 animate-pulse' : 'bg-lt-brand-primary dark:bg-brand-primary'}`}
-                    aria-label={isVoiceActive ? "Stop voice session" : "Start voice session"}
+                    onClick={onToggleSession}
+                    className={`w-16 h-16 flex items-center justify-center rounded-full transition-all duration-300 text-white ${isSessionActive ? 'bg-red-500 animate-pulse' : 'bg-lt-brand-primary dark:bg-brand-primary'}`}
+                    aria-label={isSessionActive ? "Stop voice session" : "Start voice session"}
                 >
                     <MicrophoneIcon className="w-8 h-8" />
                 </RippleButton>
                  <p className="text-xs text-center text-lt-brand-text-secondary dark:text-brand-text-secondary mt-3">
-                    {isVoiceActive ? 'EAGOX is listening...' : 'Tap to speak'}
+                    {isSessionActive ? 'EAGOX is listening...' : 'Tap to speak'}
                 </p>
             </div>
         );

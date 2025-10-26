@@ -14,7 +14,7 @@ const saveUsers = (users: User[]) => {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
 };
 
-export const register = (newUser: Required<User>): { success: boolean, message: string } => {
+export const register = (newUser: Omit<Required<User>, 'photoUrl'>): { success: boolean, message: string } => {
     const users = getUsers();
     const userExists = users.some(user => user.email === newUser.email);
 
@@ -34,7 +34,7 @@ export const register = (newUser: Required<User>): { success: boolean, message: 
     return { success: true, message: 'Registration successful!' };
 };
 
-export const login = (credentials: Omit<Required<User>, 'name'>): { success: boolean, message: string, user?: User } => {
+export const login = (credentials: Omit<Required<User>, 'name' | 'photoUrl'>): { success: boolean, message: string, user?: User } => {
     const users = getUsers();
     const user = users.find(u => u.email === credentials.email && u.password === credentials.password);
 
@@ -61,4 +61,29 @@ export const getCurrentUser = (): User | null => {
         console.error("Failed to parse user session", error);
         return null;
     }
+};
+
+export const updateUserProfile = (email: string, updates: Partial<Pick<Required<User>, 'name' | 'photoUrl' | 'password'>>): { success: boolean, message: string, user?: User } => {
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.email === email);
+
+    if (userIndex === -1) {
+        return { success: false, message: 'User not found.' };
+    }
+
+    // Update user in the main user list
+    const updatedUserInDb = { ...users[userIndex], ...updates };
+    users[userIndex] = updatedUserInDb;
+    saveUsers(users);
+
+    // Update current session if it's the same user
+    const sessionUser = getCurrentUser();
+    if (sessionUser && sessionUser.email === email) {
+        const { password, ...sessionUpdates } = updates;
+        const newSessionUser = { ...sessionUser, ...sessionUpdates };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(newSessionUser));
+        return { success: true, message: 'Profile updated successfully!', user: newSessionUser };
+    }
+
+    return { success: true, message: 'Profile updated successfully!' };
 };
