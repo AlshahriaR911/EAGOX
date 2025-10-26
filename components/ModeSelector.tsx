@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ChatMode } from '../types';
 import { RippleButton } from './common/RippleButton';
 import { MicrophoneIcon } from './icons/MicrophoneIcon';
+import { CodeIcon } from './icons/CodeIcon';
+import { ChevronDownIcon } from './icons/ChevronDownIcon';
 
 const TextIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -21,44 +23,114 @@ const MultimodalIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
-
 interface ModeSelectorProps {
     currentMode: ChatMode;
     onModeChange: (mode: ChatMode) => void;
     isLoading: boolean;
 }
 
-const modes: { id: ChatMode; label: string; icon: React.FC<{ className?: string }> }[] = [
+const featureModes: { id: ChatMode; label: string; icon: React.FC<{ className?: string }> }[] = [
+    { id: 'multimodal', label: 'Multi', icon: MultimodalIcon },
     { id: 'text', label: 'Text', icon: TextIcon },
     { id: 'image', label: 'Image', icon: ImageIcon },
-    { id: 'multimodal', label: 'Multi', icon: MultimodalIcon },
-    { id: 'voice', label: 'Voice', icon: MicrophoneIcon },
+    { id: 'code', label: 'Code', icon: CodeIcon },
 ];
 
+const voiceMode = { id: 'voice', label: 'Voice', icon: MicrophoneIcon };
+
+
 export const ModeSelector: React.FC<ModeSelectorProps> = ({ currentMode, onModeChange, isLoading }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Effect to close dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [dropdownRef]);
     
-    const getButtonClass = (mode: ChatMode) => {
+    const handleModeSelect = (mode: ChatMode) => {
+        onModeChange(mode);
+        setIsOpen(false);
+    };
+
+    const isFeatureModeActive = featureModes.some(m => m.id === currentMode);
+    const activeFeatureMode = featureModes.find(m => m.id === currentMode) || featureModes[0];
+    const ActiveIcon = activeFeatureMode.icon;
+    
+    const getVoiceButtonClass = () => {
         const baseClass = "flex-1 text-sm font-medium py-2 px-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
-        if (mode === currentMode) {
+        if (currentMode === 'voice') {
             return `${baseClass} bg-lt-brand-primary dark:bg-brand-primary text-white shadow`;
         }
         return `${baseClass} bg-lt-brand-surface dark:bg-brand-surface text-lt-brand-text-secondary dark:text-brand-text-secondary hover:bg-lt-brand-border dark:hover:bg-brand-border`;
     };
 
+    const getFeatureButtonClass = () => {
+         const baseClass = "w-full text-sm font-medium py-2 px-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+        if (isFeatureModeActive) {
+             return `${baseClass} bg-lt-brand-primary dark:bg-brand-primary text-white shadow`;
+        }
+        return `${baseClass} bg-lt-brand-surface dark:bg-brand-surface text-lt-brand-text-secondary dark:text-brand-text-secondary hover:bg-lt-brand-border dark:hover:bg-brand-border`;
+    }
+
     return (
         <div className="px-4 md:px-6 pt-4 max-w-4xl mx-auto w-full">
             <div className="p-1.5 bg-lt-brand-bg-light dark:bg-brand-bg-dark rounded-xl border border-lt-brand-border dark:border-brand-border flex items-center gap-1.5">
-                {modes.map(({ id, label, icon: Icon }) => (
+                {/* Feature Dropdown */}
+                <div className="relative flex-[4]" ref={dropdownRef}>
                     <RippleButton
-                        key={id}
-                        onClick={() => onModeChange(id)}
-                        className={getButtonClass(id)}
-                        disabled={isLoading && id !== currentMode}
+                        onClick={() => setIsOpen(!isOpen)}
+                        className={getFeatureButtonClass()}
+                        disabled={isLoading}
+                        aria-haspopup="true"
+                        aria-expanded={isOpen}
                     >
-                       <Icon className="w-5 h-5" />
-                       <span className="hidden sm:inline">{label}</span>
+                        <ActiveIcon className="w-5 h-5" />
+                        <span className="hidden sm:inline">{activeFeatureMode.label}</span>
+                        <ChevronDownIcon className="w-4 h-4 ml-auto transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}/>
                     </RippleButton>
-                ))}
+                    
+                    {isOpen && (
+                        <div className="absolute bottom-full mb-2 w-full bg-lt-brand-surface dark:bg-brand-surface border border-lt-brand-border dark:border-brand-border rounded-lg shadow-lg z-20 animate-fade-in-slide-up origin-bottom">
+                            <ul className="py-1">
+                                {featureModes.map(({ id, label, icon: Icon }) => (
+                                    <li key={id}>
+                                        <button
+                                            onClick={() => handleModeSelect(id)}
+                                            className={`w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                                currentMode === id 
+                                                ? 'bg-lt-brand-primary/10 dark:bg-brand-primary/20 text-lt-brand-primary dark:text-brand-primary' 
+                                                : 'text-lt-brand-text dark:text-brand-text hover:bg-lt-brand-border dark:hover:bg-brand-border'
+                                            }`}
+                                        >
+                                            <Icon className="w-5 h-5"/>
+                                            {label}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
+                {/* Voice Button */}
+                <RippleButton
+                    key={voiceMode.id}
+                    onClick={() => onModeChange(voiceMode.id)}
+                    className={getVoiceButtonClass()}
+                    disabled={isLoading && voiceMode.id !== currentMode}
+                >
+                    <voiceMode.icon className="w-5 h-5" />
+                    <span className="hidden sm:inline">{voiceMode.label}</span>
+                </RippleButton>
             </div>
         </div>
     );

@@ -24,9 +24,14 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, user
                 ? 'bg-lt-brand-primary dark:bg-brand-primary text-lt-brand-bg-light dark:text-brand-bg-dark rounded-br-none' 
                 : 'bg-lt-brand-surface dark:bg-brand-surface text-lt-brand-text dark:text-brand-text rounded-bl-none border border-lt-brand-border dark:border-brand-border'
             }`}>
-                <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                </div>
+                {message.attachment && (
+                    <img src={message.attachment} alt="User attachment" className="mb-2 rounded-lg max-w-full h-auto" />
+                )}
+                {message.content && (
+                    <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                    </div>
+                )}
                 {message.imageUrl && (
                     <img src={message.imageUrl} alt="Generated" className="mt-2 rounded-lg max-w-full h-auto" />
                 )}

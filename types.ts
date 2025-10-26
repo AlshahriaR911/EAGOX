@@ -5,6 +5,7 @@ export interface ChatMessage {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  attachment?: string; // Data URL for user-uploaded image
 }
 
 export interface User {
@@ -15,4 +16,4 @@ export interface User {
 
 export type AiAgent = 'gemini-flash' | 'gemini-pro';
 
-export type ChatMode = 'text' | 'image' | 'multimodal' | 'voice';
+export type ChatMode = 'text' | 'image' | 'multimodal' | 'voice' | 'code';

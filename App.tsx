@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Chat, LiveSession, LiveServerMessage } from '@google/genai';
+// Fix: Removed non-exported type 'LiveSession'.
+import { Chat, LiveServerMessage } from '@google/genai';
 
 import type { ChatMessage, User, ChatMode } from './types';
 import { getCurrentUser, logout } from './services/authService';
@@ -12,7 +14,8 @@ import {
     connectLiveSession,
     decode,
     decodeAudioData,
-    createBlob
+    createBlob,
+    EAGOX_CODE_SYSTEM_PROMPT
 } from './services/geminiService';
 
 import { Login } from './components/Login';
@@ -35,11 +38,13 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
     const chatRef = useRef<Chat | null>(null);
+    const codeChatRef = useRef<Chat | null>(null);
     const [chatMode, setChatMode] = useState<ChatMode>('multimodal');
 
     // Voice session state
     const [isVoiceActive, setIsVoiceActive] = useState(false);
-    const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+    // Fix: Used ReturnType to correctly infer the type of the session promise, as `LiveSession` is not an exported type.
+    const sessionPromiseRef = useRef<ReturnType<typeof connectLiveSession> | null>(null);
     const currentTranscriptionRef = useRef({ user: '', model: '' });
     const inputAudioContextRef = useRef<AudioContext | null>(null);
     const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -61,6 +66,7 @@ const App: React.FC = () => {
             setCurrentUser(user);
             setIsGuest(false);
             chatRef.current = createChatSession('gemini-flash'); 
+            codeChatRef.current = createChatSession('gemini-flash', EAGOX_CODE_SYSTEM_PROMPT);
         }
         setIsAuthenticating(false);
     }, []);
@@ -85,6 +91,7 @@ const App: React.FC = () => {
         setCurrentUser(user);
         setIsGuest(false);
         chatRef.current = createChatSession('gemini-flash');
+        codeChatRef.current = createChatSession('gemini-flash', EAGOX_CODE_SYSTEM_PROMPT);
     };
     
     const handleGuestLogin = () => {
@@ -92,6 +99,7 @@ const App: React.FC = () => {
         setCurrentUser(guestUser);
         setIsGuest(true);
         chatRef.current = createChatSession('gemini-flash');
+        codeChatRef.current = createChatSession('gemini-flash', EAGOX_CODE_SYSTEM_PROMPT);
     };
 
     const handleLogout = () => {
@@ -100,15 +108,38 @@ const App: React.FC = () => {
         setCurrentUser(null);
         setMessages([]);
         chatRef.current = null;
+        codeChatRef.current = null;
         setIsGuest(false);
     };
 
-    const handleSendMessage = async (message: string) => {
-        const userMessage: ChatMessage = { role: 'user', content: message };
+    const handleSendMessage = async (message: string, image?: { data: string; mimeType: string }) => {
+        const userMessage: ChatMessage = {
+            role: 'user',
+            content: message,
+            attachment: image ? `data:${image.mimeType};base64,${image.data}` : undefined,
+        };
         setMessages(prev => [...prev, userMessage]);
 
         const imageMatch = message.match(/^\/image\s+(.*)/);
         const videoMatch = message.match(/^\/video\s+(.*)/);
+
+        // Do not process slash commands if an image is attached
+        if (image) {
+             setIsLoading(true);
+             try {
+                const activeChat = chatRef.current; // Use the main chat for multimodal
+                if (!activeChat) throw new Error("Chat session not initialized.");
+                const response = await sendMessageToAI(activeChat, message, image);
+                const modelMessage: ChatMessage = { role: 'model', content: response };
+                setMessages(prev => [...prev, modelMessage]);
+             } catch (error) {
+                  const errorMessage: ChatMessage = { role: 'model', content: error instanceof Error ? error.message : 'An unknown error occurred.' };
+                  setMessages(prev => [...prev, errorMessage]);
+             } finally {
+                 setIsLoading(false);
+             }
+             return;
+        }
 
         if (imageMatch) {
             setIsLoading(true);
@@ -147,8 +178,9 @@ const App: React.FC = () => {
         } else {
             setIsLoading(true);
             try {
-                if (!chatRef.current) throw new Error("Chat session not initialized.");
-                const response = await sendMessageToAI(chatRef.current, message);
+                const activeChat = chatMode === 'code' ? codeChatRef.current : chatRef.current;
+                if (!activeChat) throw new Error("Chat session not initialized.");
+                const response = await sendMessageToAI(activeChat, message);
                 const modelMessage: ChatMessage = { role: 'model', content: response };
                 setMessages(prev => [...prev, modelMessage]);
             } catch (error) {

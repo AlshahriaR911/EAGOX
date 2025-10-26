@@ -2,6 +2,8 @@ import React from 'react';
 import { RippleButton } from './common/RippleButton';
 import type { ChatMode } from '../types';
 import { MicrophoneIcon } from './icons/MicrophoneIcon';
+import { PaperClipIcon } from './icons/PaperClipIcon';
+import { CloseIcon } from './icons/CloseIcon';
 
 const SendIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -11,7 +13,7 @@ const SendIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 
 interface ChatInputProps {
-    onSendMessage: (message: string) => void;
+    onSendMessage: (message: string, image?: { data: string; mimeType: string }) => void;
     isLoading: boolean;
     chatMode: ChatMode;
     isVoiceActive: boolean;
@@ -20,7 +22,9 @@ interface ChatInputProps {
 
 export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, chatMode, isVoiceActive, onToggleVoiceSession }) => {
     const [message, setMessage] = React.useState('');
+    const [imagePreview, setImagePreview] = React.useState<{ data: string; mimeType: string; rawUrl: string } | null>(null);
     const textAreaRef = React.useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     React.useEffect(() => {
         if (chatMode !== 'voice' && textAreaRef.current) {
@@ -30,16 +34,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
         }
     }, [message, chatMode]);
 
+    const handleFileSelect = () => fileInputRef.current?.click();
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const rawUrl = reader.result as string;
+                const base64String = rawUrl.split(',')[1];
+                setImagePreview({ data: base64String, mimeType: file.type, rawUrl });
+            };
+            reader.readAsDataURL(file);
+        }
+        if (event.target) {
+            event.target.value = '';
+        }
+    };
+
+    const removeImage = () => {
+        setImagePreview(null);
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const trimmedMessage = message.trim();
-        if (trimmedMessage && !isLoading) {
-            if (chatMode === 'image' && !trimmedMessage.startsWith('/')) {
-                onSendMessage(`/image ${trimmedMessage}`);
-            } else {
-                onSendMessage(trimmedMessage);
-            }
+        if ((trimmedMessage || imagePreview) && !isLoading) {
+            onSendMessage(trimmedMessage, imagePreview ? { data: imagePreview.data, mimeType: imagePreview.mimeType } : undefined);
             setMessage('');
+            removeImage();
         }
     };
     
@@ -53,9 +76,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
     const placeholderText = {
         text: 'Type your message to EAGOX...',
         image: 'Describe the image you want to create...',
-        multimodal: 'Chat with EAGOX... (try /image or /video)',
+        code: 'Describe the code you want to generate...',
+        multimodal: 'Type a message or attach an image...',
         voice: 'Start conversation with EAGOX...'
     }[chatMode];
+
+    const canAttachFile = ['text', 'multimodal', 'code'].includes(chatMode);
+
 
     if (chatMode === 'voice') {
         return (
@@ -76,8 +103,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
 
     return (
         <div className="px-4 pb-4 md:px-6 md:pb-6">
+            {imagePreview && (
+                <div className="max-w-4xl mx-auto mb-2 relative w-24 h-24 p-1 border border-lt-brand-border dark:border-brand-border rounded-lg">
+                    <img src={imagePreview.rawUrl} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                    <button onClick={removeImage} className="absolute -top-2 -right-2 bg-lt-brand-bg-med dark:bg-brand-bg-light rounded-full p-0.5 border border-lt-brand-border dark:border-brand-border text-lt-brand-text-secondary dark:text-brand-text-secondary hover:scale-110 transition-transform">
+                        <CloseIcon className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="flex items-end gap-3 max-w-4xl mx-auto">
-                 <div className="flex-1 relative">
+                 <div className="flex-1 relative flex items-center">
+                    {canAttachFile && (
+                        <>
+                            <button 
+                                type="button" 
+                                onClick={handleFileSelect} 
+                                className="p-2 text-lt-brand-text-secondary dark:text-brand-text-secondary hover:text-lt-brand-primary dark:hover:text-brand-primary transition-colors disabled:opacity-50"
+                                disabled={isLoading}
+                                aria-label="Attach file"
+                            >
+                                <PaperClipIcon className="w-6 h-6" />
+                            </button>
+                            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+                        </>
+                    )}
                     <textarea
                         ref={textAreaRef}
                         value={message}
@@ -85,13 +134,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading, 
                         onKeyDown={handleKeyDown}
                         placeholder={placeholderText}
                         rows={1}
-                        className="w-full py-3 pl-4 pr-12 bg-lt-brand-surface dark:bg-brand-surface text-lt-brand-text dark:text-brand-text rounded-2xl border border-lt-brand-border dark:border-brand-border focus:outline-none focus:ring-2 focus:ring-lt-brand-primary dark:focus:ring-brand-primary resize-none transition-all max-h-40 overflow-y-auto"
+                        className="w-full py-3 pl-2 pr-4 bg-lt-brand-surface dark:bg-brand-surface text-lt-brand-text dark:text-brand-text rounded-2xl border border-lt-brand-border dark:border-brand-border focus:outline-none focus:ring-2 focus:ring-lt-brand-primary dark:focus:ring-brand-primary resize-none transition-all max-h-40 overflow-y-auto"
                         disabled={isLoading}
                     />
                 </div>
                 <RippleButton 
                     type="submit" 
-                    disabled={isLoading || !message.trim()}
+                    disabled={isLoading || (!message.trim() && !imagePreview)}
                     className="w-12 h-12 flex items-center justify-center bg-lt-brand-primary dark:bg-brand-primary text-white rounded-full transition-colors duration-200 disabled:bg-lt-brand-text-secondary/50 dark:disabled:bg-brand-text-secondary/50 disabled:cursor-not-allowed flex-shrink-0"
                     aria-label="Send message"
                 >
