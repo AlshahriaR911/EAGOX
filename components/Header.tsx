@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onLogout, on
             </div>
 
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                <h1 className="text-2xl font-bold font-roba text-lt-brand-text dark:text-brand-text">EAGOX</h1>
+                <h1 className="text-3xl font-bold font-roba text-lt-brand-text dark:text-brand-text">EAGOX</h1>
             </div>
 
             <div className="flex items-center gap-2">

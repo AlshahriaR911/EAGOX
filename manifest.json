@@ -1,0 +1,21 @@
+{
+  "name": "EAGOX AI",
+  "short_name": "EAGOX",
+  "description": "EAGOX is a compact yet powerful AI with Nano Banana support, capable of holding smart, fast, and basic-level human-like conversations.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0E10",
+  "theme_color": "#0D0E10",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

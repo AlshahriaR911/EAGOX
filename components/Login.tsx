@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { login } from '../services/authService';
 import { RippleButton } from './common/RippleButton';
 import type { User } from '../types';
-import { Logo } from './icons/Logo';
+import { EagoxLogo } from './icons/EagoxLogo';
 
 interface LoginProps {
     onLoginSuccess: (user: User) => void;
@@ -37,7 +38,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup, 
         <div className="min-h-screen flex items-center justify-center bg-lt-brand-bg-light dark:bg-brand-bg-dark text-lt-brand-text dark:text-brand-text p-4">
             <div className="w-full max-w-sm p-8 space-y-6 bg-lt-brand-bg-med dark:bg-brand-bg-light rounded-2xl shadow-xl border border-lt-brand-border dark:border-brand-border">
                 <div className="text-center">
-                    <Logo className="h-10 w-auto mx-auto text-lt-brand-text dark:text-brand-text" />
+                    <EagoxLogo className="h-16 w-auto mx-auto text-lt-brand-primary dark:text-brand-primary" />
                     <p className="mt-4 text-sm text-lt-brand-text-secondary dark:text-brand-text-secondary">Sign in to continue</p>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
